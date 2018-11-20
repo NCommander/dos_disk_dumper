@@ -16,7 +16,7 @@ all:	.SYMBOLIC serdump.exe
 
 HELLOOBJS = serdump.obj diskinfo.obj
 serdump.exe: $(HELLOOBJS) .PRECIOUS
-	wlink $(LNKOPT) system dos name hello file hello.obj file diskinfo.obj
+	wlink $(LNKOPT) system dos name serdump file serdump.obj file diskinfo.obj
 
 clean: .SYMBOLIC
         @if exist *.obj rm *.obj

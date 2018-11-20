@@ -26,11 +26,11 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    megabytes_per_cylinder = ((sectors+1)*512)/1024;
-    cylinder_mb = megabytes_per_cylinder * cylinders/1024;
+    megabytes_per_cylinder = (float)((sectors)*512)/1024;
+    cylinder_mb = megabytes_per_cylinder * (float)cylinders/1024;
     megabytes = cylinder_mb * (heads+1);
     printf("Disk Geometry Information:\n");
-    printf("\tDisk %u: Cylinders: %u, Heads: %u, Sectors: %u (%.2f MiB)\n\n ", disk_id-0x80+1, cylinders, heads+1, sectors+1, megabytes);
+    printf("\tDisk %u: Cylinders: %u, Heads: %u, Sectors: %u (%.2f MiB)\n\n ", disk_id-0x80+1, cylinders, heads+1, sectors, megabytes);
 
     printf("BIOS reported %d fixed disks\n", num_of_disks);
 
