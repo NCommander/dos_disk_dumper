@@ -14,9 +14,14 @@ LNKOPT = option quiet
 
 all:	.SYMBOLIC serdump.exe
 
-HELLOOBJS = serdump.obj diskinfo.obj
+HELLOOBJS = serdump.obj diskinfo.obj xmodem.obj crc16.obj serialio.obj
 serdump.exe: $(HELLOOBJS) .PRECIOUS
-	wlink $(LNKOPT) system dos name serdump file serdump.obj file diskinfo.obj
+	wlink $(LNKOPT) system dos name serdump &
+                file serdump.obj &
+                file diskinfo.obj &
+                file crc16.obj &
+                file xmodem.obj &
+                file serialio.obj
 
 clean: .SYMBOLIC
         @if exist *.obj rm *.obj

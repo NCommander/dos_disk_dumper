@@ -1,7 +1,6 @@
 #include <stdio.h>
 
-void asm_test(int *value1, int* value2);
-int __cdecl get_disk_geometry(unsigned int disk_id, unsigned int *cylinders, unsigned int *heads, unsigned int *sectors, unsigned int *num_of_disks);
+#include "serdump.h"
 
 #define BYTES_PER_SECTOR 512
 int main(int argc, char *argv[]) {
