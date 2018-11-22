@@ -1,8 +1,13 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <dos.h>
+#include <conio.h>
 
+#include "com.h"
 #include "serdump.h"
 
-#define BYTES_PER_SECTOR 512
+void __cdecl __far ack_pic();
+
 int main(int argc, char *argv[]) {
     unsigned int disk_id = 0x80;
     unsigned int cylinders = 10;
@@ -13,6 +18,8 @@ int main(int argc, char *argv[]) {
     int ret = 0;
     float megabytes_per_cylinder = 0;
     float cylinder_mb = 0;
+    PORT *port;
+    int c;
 
     printf("Serial Dumper v0.1\n");
     printf("Copyright (C) 2018 - Michael Casadevall\n");
@@ -33,5 +40,33 @@ int main(int argc, char *argv[]) {
 
     printf("BIOS reported %d fixed disks\n", num_of_disks);
 
+    /* Initialize the serial port and install handler */
+    port = port_open( COM1_UART, COM1_INTERRUPT );
+    if ( port== NULL ) {
+        printf( "Failed to open the port!\n" );
+        exit( 1 );
+    }
+    port_set( port, 2400L, 'N', 8, 1 );
+    /*
+    * The program stays in this loop until the user hits the
+    * Escape key.  The loop reads in a character from the
+    * keyboard and sends it to the COM port.  It then reads
+    * in a character from the COM port, and prints it on the
+    * screen.
+    */
+    for ( ; ; ) {
+        if ( kbhit() ) {
+            c = getch();
+            if ( c == 27 )
+                break;
+            else
+                port_putc( (unsigned char) c, port );
+        }
+        c = port_getc( port );
+        if ( c >= 0 )
+            putc( c, stdout );
+    }
+    port_close( port );
     return 0;
+
 }
