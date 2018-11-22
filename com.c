@@ -209,11 +209,11 @@ void port_set( PORT *port,
  * two steps, then disabling the divisor latch so the other
  * registers can be accessed normally.
  */
-  low_divisor = (char) (115200L / speed ) & 0xff;
-  high_divisor = (char) ((115200L /  speed ) >> 8);
+  //low_divisor = (char) (115200L / speed ) & 0xff;
+  //high_divisor = (char) ((115200L /  speed ) >> 8);
   outportb( port->uart_base + LCR, LCR_DLAB );
-  outportb( port->uart_base + DLL, low_divisor );
-  outportb( port->uart_base + DLM, high_divisor );
+  outportb( port->uart_base + DLL, 1 );
+  outportb( port->uart_base + DLM, 0 );
   outportb( port->uart_base + LCR, 0 );
 /*
  * Setting up the line control register establishes the

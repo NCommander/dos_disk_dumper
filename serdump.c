@@ -1,16 +1,59 @@
+#include <i86.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <dos.h>
 #include <conio.h>
+#include <bios.h>
+#include <malloc.h>
 
 #include "com.h"
 #include "serdump.h"
 
-void __cdecl __far ack_pic();
+// XModem support features
+PORT *port;
+int c;
 
+// Borrowed from watcom test library
+#define HI( w )     (((w) >> 8) & 0xFF)
+
+/* Statically allocate a buffer for data read from the drive */
+unsigned char __far drive_buffer[16*BYTES_PER_SECTOR]; // Hold 16 sectors
+
+// Send a bute out on serial
+void _outbyte(unsigned char c) {
+    int ret = port_putc(c, port);
+
+    while (ret == -1) {
+        delay(1);
+        ret = port_putc(c, port);
+    };
+}
+
+// Read byte in
+int _inbyte(unsigned short timeout) {
+    int c;
+
+     do {
+        c=port_getc(port);
+        if (c == -1) {
+            delay(1); /* 60 us * 16 = 960 us (~ 1 ms) */
+        }
+        if (timeout) {
+            if (--timeout == 0) {
+                printf("Timeout");
+                return -2;
+            }
+        }
+    } while (c == -1);
+
+    return (unsigned short)c;
+}
+
+#define SECTORS_TO_ALLOCATE 16
+#define DRIVE_ID 0x80
 int main(int argc, char *argv[]) {
-    unsigned int disk_id = 0x80;
-    unsigned int cylinders = 10;
+    unsigned int disk_id = DRIVE_ID;
+    unsigned int cylinders = 0;
     unsigned int heads = 0;
     unsigned int sectors = 0;
     unsigned int num_of_disks = 0;
@@ -18,12 +61,22 @@ int main(int argc, char *argv[]) {
     int ret = 0;
     float megabytes_per_cylinder = 0;
     float cylinder_mb = 0;
-    PORT *port;
-    int c;
+    struct diskinfo_t di;
+    unsigned short status;
+    unsigned int current_cylinder = 0;
+    unsigned int current_head = 0;
+    unsigned int current_sector = 1;
+    long packet_number = 1;
+    int offset = 0;
+    int i;
 
     printf("Serial Dumper v0.1\n");
     printf("Copyright (C) 2018 - Michael Casadevall\n");
     printf("\n");
+
+    if (drive_buffer == NULL) {
+        printf("ERROR, unable to allocate %d bytes\n, erroring out!", SECTORS_TO_ALLOCATE*BYTES_PER_SECTOR);
+    }
 
     ret = get_disk_geometry(disk_id, &cylinders, &heads, &sectors, &num_of_disks);
     if (ret != 1) {
@@ -46,27 +99,76 @@ int main(int argc, char *argv[]) {
         printf( "Failed to open the port!\n" );
         exit( 1 );
     }
-    port_set( port, 2400L, 'N', 8, 1 );
-    /*
-    * The program stays in this loop until the user hits the
-    * Escape key.  The loop reads in a character from the
-    * keyboard and sends it to the COM port.  It then reads
-    * in a character from the COM port, and prints it on the
-    * screen.
-    */
-    for ( ; ; ) {
-        if ( kbhit() ) {
-            c = getch();
-            if ( c == 27 )
-                break;
-            else
-                port_putc( (unsigned char) c, port );
-        }
-        c = port_getc( port );
-        if ( c >= 0 )
-            putc( c, stdout );
-    }
-    port_close( port );
-    return 0;
+    port_set( port, 115200L, 'N', 8, 1 );
 
+    /* Start reading sectors in from the drive one by one */
+    printf("\n");
+
+    /* Do a reset on the drive to make sure it's ready */
+    di.drive = DRIVE_ID;
+    di.head = 0;
+    di.track = 0;
+    di.sector = 1;
+    di.nsectors = 1;
+    di.buffer = NULL;
+
+    // Not noted in the docs, but error is in the high bit
+    status = _bios_disk(_DISK_RESET, &di);
+    if (HI(status) != 0) {
+        printf("_DISK_RESET failed with %4.4x! Is hard drive actually ready?\n", status);
+        ret = 1;
+        goto clean_up;
+    }
+
+    /* Start reading sectors, docs say that we should try up to three times to read a sector in case of error */
+    for (current_sector = 1; current_sector != sectors+1; current_sector++) {
+        // Read the buffer until it's full, or we run out of sectors to read
+        di.drive = DRIVE_ID;
+        di.head = current_cylinder;
+        di.track = current_head;
+        di.sector = current_sector;
+        di.nsectors = 1;
+        di.buffer = drive_buffer+offset;
+
+        printf("Reading Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
+        for (i = 0; i != 3; i++) {
+            status = _bios_disk(_DISK_READ, &di);
+            if (HI(status) != 0) {
+                printf("_DISK_READ failed with %4.4x! Retry: %d\n", status, i);
+            } else {
+                // Read the data successfully
+                break;
+            }
+        }
+
+        if (HI(status) != 0) {
+            printf("Hit retry count, bailing out\n");
+            goto clean_up;
+        }
+
+        // xmodemTransmit must always be a multiple of 128
+        printf("Transmitting Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
+        for (i = 0; i !=4 ; i++) { 
+            int offset2 = i*128;
+            packet_number = xmodemTransmit(drive_buffer+offset+offset2, 128, packet_number);
+            if (packet_number < 0) {
+                printf("ERROR: Transmission Error %l\n", packet_number);
+                goto clean_up;
+            }
+        }
+
+        offset = offset + BYTES_PER_SECTOR;
+        // If we're reached the end of the buffer, reset it to zero and keep going
+        if (offset >= 15*BYTES_PER_SECTOR) {
+            offset = 0;
+        }
+
+        // If the buffer is fill, transmit it, and then keep going
+    }
+
+    xmodemFinalize();
+
+    clean_up:
+    port_close(port);
+    return ret;
 }
