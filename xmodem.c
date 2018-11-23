@@ -161,7 +161,7 @@ int xmodemReceive(unsigned char *dest, int destsz)
 	}
 }
 
-int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno)
+int xmodemTransmit(unsigned char __far *src, int srcsz, unsigned int * packetno)
 {
 	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
 	int bufsz = 0;
@@ -169,7 +169,7 @@ int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno)
 	int i, c, len = 0;
 	int retry;
 
-	if (packetno == 1) { // Do handshake
+	if (*packetno == 1) { // Do handshake
 		for(;;) {
 			for( retry = 0; retry < 16; ++retry) {
 				if ((c = _inbyte((DLY_1S)<<1)) >= 0) {
@@ -202,8 +202,8 @@ int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno)
 	for(;;) {
 	start_trans:
 		xbuff[0] = SOH; bufsz = 128;
-		xbuff[1] = packetno;
-		xbuff[2] = ~packetno;
+		xbuff[1] = *packetno;
+		xbuff[2] = ~(*packetno);
 		c = srcsz - len;
 		if (c >= bufsz) c = bufsz;
 		if (c >= 0) {
@@ -234,7 +234,8 @@ int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno)
 				if ((c = _inbyte(DLY_1S)) >= 0 ) {
 					switch (c) {
 					case ACK:
-						return packetno+1;
+						(*packetno)++;
+						return 0;
 					case CAN:
 						if ((c = _inbyte(DLY_1S)) == CAN) {
 							_outbyte(ACK);
@@ -254,11 +255,8 @@ int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno)
 			flushinput();
 			return -4; /* xmit error */
 		}
-		else {
-			return packetno;
-		}
 	}
-	return packetno;
+	return 0;
 }
 
 void xmodemFinalize() {

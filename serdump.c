@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     unsigned int current_cylinder = 0;
     unsigned int current_head = 0;
     unsigned int current_sector = 1;
-    long packet_number = 1;
+    unsigned int packet_number = 1;
     int offset = 0;
     int i;
 
@@ -121,49 +121,54 @@ int main(int argc, char *argv[]) {
     }
 
     /* Start reading sectors, docs say that we should try up to three times to read a sector in case of error */
-    for (current_sector = 1; current_sector != sectors+1; current_sector++) {
-        // Read the buffer until it's full, or we run out of sectors to read
-        di.drive = DRIVE_ID;
-        di.head = current_cylinder;
-        di.track = current_head;
-        di.sector = current_sector;
-        di.nsectors = 1;
-        di.buffer = drive_buffer+offset;
+    for (current_cylinder = 0; current_cylinder != cylinders+1; current_cylinder++) {
+        for (current_head = 0; current_head != heads+1; current_head++) {
+            offset = 0; /* Go back to the start of the buffer for each head change */
+            for (current_sector = 1; current_sector != sectors+1; current_sector++) {
+                // Read the buffer until it's full, or we run out of sectors to read
+                di.drive = DRIVE_ID;
+                di.track = current_cylinder;
+                di.head = current_head;
+                di.sector = current_sector;
+                di.nsectors = 1;
+                di.buffer = drive_buffer+offset;
 
-        printf("Reading Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
-        for (i = 0; i != 3; i++) {
-            status = _bios_disk(_DISK_READ, &di);
-            if (HI(status) != 0) {
-                printf("_DISK_READ failed with %4.4x! Retry: %d\n", status, i);
-            } else {
-                // Read the data successfully
-                break;
+                printf("Reading Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
+                for (i = 0; i != 3; i++) {
+                    status = _bios_disk(_DISK_READ, &di);
+                    if (HI(status) != 0) {
+                        printf("_DISK_READ failed with %4.4x! Retry: %d\n", status, i);
+                    } else {
+                        // Read the data successfully
+                        break;
+                    }
+                }
+
+                if (HI(status) != 0) {
+                    printf("Hit retry count, bailing out\n");
+                    goto clean_up;
+                }
+
+                // xmodemTransmit must always be a multiple of 128
+                printf("Transmitting Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
+                for (i = 0; i !=4 ; i++) { 
+                    int offset2 = i*128;
+                    status = xmodemTransmit(drive_buffer+offset+offset2, 128, &packet_number);
+                    if (packet_number < 0) {
+                        printf("ERROR: Transmission Error %l\n", packet_number);
+                        goto clean_up;
+                    }
+                }
+
+                offset = offset + BYTES_PER_SECTOR;
+                // If we're reached the end of the buffer, reset it to zero and keep going
+                if (offset >= 15*BYTES_PER_SECTOR) {
+                    offset = 0;
+                }
+
+                // If the buffer is fill, transmit it, and then keep going
             }
         }
-
-        if (HI(status) != 0) {
-            printf("Hit retry count, bailing out\n");
-            goto clean_up;
-        }
-
-        // xmodemTransmit must always be a multiple of 128
-        printf("Transmitting Cylinder: %d, Head: %d, Sector: %d\n", current_cylinder, current_head, current_sector);
-        for (i = 0; i !=4 ; i++) { 
-            int offset2 = i*128;
-            packet_number = xmodemTransmit(drive_buffer+offset+offset2, 128, packet_number);
-            if (packet_number < 0) {
-                printf("ERROR: Transmission Error %l\n", packet_number);
-                goto clean_up;
-            }
-        }
-
-        offset = offset + BYTES_PER_SECTOR;
-        // If we're reached the end of the buffer, reset it to zero and keep going
-        if (offset >= 15*BYTES_PER_SECTOR) {
-            offset = 0;
-        }
-
-        // If the buffer is fill, transmit it, and then keep going
     }
 
     xmodemFinalize();

@@ -9,7 +9,7 @@ int __cdecl get_disk_geometry(unsigned int disk_id, unsigned int *cylinders, uns
 void __cdecl init_serial_port(int port, int divisor);
 
 // Transmit something over xmodem
-int xmodemTransmit(unsigned char __far *src, int srcsz, int packetno);
+int xmodemTransmit(unsigned char __far *src, int srcsz, unsigned int * packetno);
 void xmodemFinalize();
 
 int _inbyte(unsigned short timeout); // msec timeout
