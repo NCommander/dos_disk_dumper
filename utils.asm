@@ -2,22 +2,6 @@
 
 ; I'm guessing because WASM is hard to find example code for in real mode
 
-SaveRegisters MACRO
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-ENDM
-
-RestoreRegisters MACRO
-    pop bx
-    pop cx
-    pop dx
-    pop si
-    pop di
-ENDM
-
 _TEXT SEGMENT 'CODE'
     ASSUME CS:_TEXT
 
@@ -43,7 +27,7 @@ _get_disk_geometry   PROC NEAR
     xor ax, ax
     xor dx, dx
     mov ah, 08h
-    mov dx, 80h
+    mov dx, [bp+_disk_id$]
 
     mov es, ax
     xor di, 0h
@@ -85,14 +69,13 @@ _get_disk_geometry   PROC NEAR
 
     pop es
     pop bp
-    mov ax, 1
+    mov ax, 0
     ret
 
     error1:
-    mov ax, -1
     pop es
-    RestoreRegisters
     pop bp
+    mov ax, -1
     ret
 
     _get_disk_geometry ENDP

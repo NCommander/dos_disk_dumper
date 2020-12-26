@@ -12,16 +12,13 @@ LNKOPT = option quiet
 .EXTENSIONS:
 .EXTENSIONS: .exe .rex .lib .obj .wbj .asm .c .for
 
-all:	.SYMBOLIC serdump.exe
+all:	.SYMBOLIC diskdump.exe
 
-HELLOOBJS = serdump.obj utils.obj xmodem.obj crc16.obj com.obj
-serdump.exe: $(HELLOOBJS) .PRECIOUS
-	wlink $(LNKOPT) system dos name serdump &
-                file serdump.obj &
-                file utils.obj &
-                file crc16.obj &
-                file xmodem.obj &
-                file com.obj
+HELLOOBJS = diskdump.obj utils.obj
+diskdump.exe: $(HELLOOBJS) .PRECIOUS
+	wlink $(LNKOPT) system dos name diskdump &
+                file diskdump.obj &
+                file utils.obj
 
 clean: .SYMBOLIC
         @if exist *.obj rm *.obj
